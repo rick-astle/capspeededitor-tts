@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CapCurve - Speed Ramp & Audio Warp Studio</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdfa',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                        },
+                        neon: {
+                            cyan: '#00f2fe',
+                            blue: '#4facfe',
+                            purple: '#a855f7',
+                            pink: '#ec4899',
+                            emerald: '#10b981',
+                            amber: '#f59e0b'
+                        },
+                        dark: {
+                            900: '#090a0f',
+                            800: '#12141d',
+                            700: '#1a1d2b',
+                            600: '#262a3d',
+                            500: '#343a52'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #090a0f;
+            color: #f3f4f6;
+            overflow-x: hidden;
+            user-select: none;
+        }
+
+        .glass-panel {
+            background: rgba(18, 20, 29, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #090a0f;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #262a3d;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #343a52;
+        }
+
+        .tooltip-arrow::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 6px 6px 0 6px;
+            border-style: solid;
+            border-color: #00f2fe transparent transparent transparent;
+        }
+
+        #curveCanvas {
+            cursor: crosshair;
+        }
+        
+        input[type=range] {
+            accent-color: #00f2fe;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between antialiased selection:bg-cyan-500 selection:text-black">
+
+    <header class="h-16 border-b border-gray-800/80 bg-dark-900/90 backdrop-blur-md px-6 flex items-center justify-between z-30 sticky top-0">
+        <div class="flex items-center space-x-3 cursor-pointer" id="logoHomeBtn">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 via-blue-600 to-purple-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+            </div>
+            <div>
+                <span class="font-bold text-lg tracking-wider bg-gradient-to-r from-cyan-400 via-teal-300 to-purple-400 bg-clip-text text-transparent">CapCurve</span>
+                <span class="text-xs px-2 py-0.5 ml-2 rounded-full bg-cyan-950/80 text-cyan-400 border border-cyan-800/50 font-mono">v3.2 ENGINE</span>
+            </div>
+        </div>
+
+        <div id="modeBadge" class="hidden flex items-center space-x-2 bg-dark-800 border border-gray-700/60 px-3 py-1.5 rounded-full text-xs font-medium">
+            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+            <span id="modeBadgeText" class="text-gray-300">Video Speed Ramp Studio</span>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <button id="backToMenuHeaderBtn" class="hidden flex items-center space-x-2 text-xs text-gray-300 hover:text-white bg-dark-800 hover:bg-dark-700 px-3 py-1.5 rounded-lg border border-gray-700 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                <span>Main Menu</span>
+            </button>
+        </div>
+    </header>
+
+    <main id="landingScreen" class="flex-1 flex flex-col items-center justify-center p-6 relative overflow-hidden transition-all duration-500">
+        <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="max-w-4xl w-full text-center space-y-8 z-10">
+            <div class="space-y-3">
+                <div class="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-dark-800 border border-cyan-500/30 text-cyan-300 text-xs font-medium mb-2">
+                    <span class="flex h-2 w-2 rounded-full bg-cyan-400"></span>
+                    <span>Real-Time WebAudio PCM Engine & Speed Ramp Exporter</span>
+                </div>
+                <h1 class="text-4xl sm:text-6xl font-black tracking-tight text-white">
+                    Master Your <span class="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500 bg-clip-text text-transparent">Audio & Video Speed</span>
+                </h1>
+                <p class="text-gray-400 text-base sm:text-lg max-w-2xl mx-auto font-normal">
+                    Craft custom speed ramps with smooth curves or step jumps, decode full audio tracks with real PCM waveforms, listen in real-time, and export.
+                </p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto pt-4">
+                
+                <!-- Video Speed Card -->
+                <div id="selectVideoBtn" class="group relative bg-gradient-to-b from-dark-800/90 to-dark-900 border border-gray-800 hover:border-cyan-500/60 rounded-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-cyan-500/10 cursor-pointer overflow-hidden">
+                    <div class="w-14 h-14 rounded-2xl bg-cyan-950/80 border border-cyan-700/50 flex items-center justify-center text-cyan-400 mb-6 group-hover:scale-110 group-hover:bg-cyan-500 group-hover:text-black transition duration-300">
+                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                        </svg>
+                    </div>
+
+                    <h3 class="text-xl font-bold text-white group-hover:text-cyan-300 transition flex items-center justify-between">
+                        <span>Video Speed Editor</span>
+                        <svg class="w-5 h-5 text-gray-500 group-hover:text-cyan-400 transform group-hover:translate-x-1 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                        </svg>
+                    </h3>
+                    <p class="text-sm text-gray-400 mt-2 leading-relaxed">
+                        Ramp video clips with smooth cubic bezier velocity curves or instant step jumps, real-time scrubbing, and keyframe exports.
+                    </p>
+
+                    <div class="mt-6 flex items-center space-x-2 text-xs font-mono text-cyan-400/80">
+                        <span class="px-2 py-1 bg-cyan-950/50 rounded border border-cyan-900/50">0.1x - 10.0x</span>
+                        <span class="px-2 py-1 bg-cyan-950/50 rounded border border-cyan-900/50">Video Upload</span>
+                        <span class="px-2 py-1 bg-cyan-950/50 rounded border border-cyan-900/50">Keyframe Export</span>
+                    </div>
+                </div>
+
+                <!-- Audio Speed Card -->
+                <div id="selectAudioBtn" class="group relative bg-gradient-to-b from-dark-800/90 to-dark-900 border border-gray-800 hover:border-purple-500/60 rounded-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-purple-500/10 cursor-pointer overflow-hidden">
+                    <div class="w-14 h-14 rounded-2xl bg-purple-950/80 border border-purple-700/50 flex items-center justify-center text-purple-400 mb-6 group-hover:scale-110 group-hover:bg-purple-500 group-hover:text-black transition duration-300">
+                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12 0c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+                        </svg>
+                    </div>
+
+                    <h3 class="text-xl font-bold text-white group-hover:text-purple-300 transition flex items-center justify-between">
+                        <span>Audio Speed & Pitch Warp</span>
+                        <svg class="w-5 h-5 text-gray-500 group-hover:text-purple-400 transform group-hover:translate-x-1 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                        </svg>
+                    </h3>
+                    <p class="text-sm text-gray-400 mt-2 leading-relaxed">
+                        Full WebAudio engine: upload MP3/WAV files, render real PCM waveforms, listen with real-time speed warping, and download rendered WAV files.
+                    </p>
+
+                    <div class="mt-6 flex items-center space-x-2 text-xs font-mono text-purple-400/80">
+                        <span class="px-2 py-1 bg-purple-950/50 rounded border border-purple-900/50">PCM Decoding</span>
+                        <span class="px-2 py-1 bg-purple-950/50 rounded border border-purple-900/50">WAV Export</span>
+                        <span class="px-2 py-1 bg-purple-950/50 rounded border border-purple-900/50">Synthesizer Demo</span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <div id="editorWorkspace" class="hidden flex-1 flex flex-col p-4 sm:p-6 space-y-6 max-w-7xl w-full mx-auto">
+        
+        <!-- TOP HALF: PREVIEW PANEL -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <div class="lg:col-span-8 bg-dark-800/90 rounded-2xl border border-gray-800 p-4 flex flex-col justify-between shadow-xl relative overflow-hidden min-h-[360px]">
+                
+                <!-- VIDEO PREVIEW PANE -->
+                <div id="videoPreviewPane" class="flex-1 flex flex-col items-center justify-center relative rounded-xl bg-dark-900 border border-gray-800 overflow-hidden group p-2">
+                    <div id="videoFrameWrapper" class="w-full max-w-lg aspect-video bg-black rounded-lg flex items-center justify-center relative overflow-hidden transition-all duration-300 shadow-2xl">
+                        <video id="htmlVideoPlayer" class="hidden w-full h-full object-cover" loop muted playsinline></video>
+                        <canvas id="simulatedVideoCanvas" class="w-full h-full object-cover"></canvas>
+                        
+                        <div class="absolute top-3 left-3 bg-black/80 backdrop-blur-md px-2.5 py-1 rounded-md border border-cyan-500/40 font-mono text-xs text-cyan-300 flex items-center space-x-1.5 z-10">
+                            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                            <span id="liveSpeedText">1.00x</span>
+                        </div>
+
+                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center space-x-4 z-10">
+                            <button id="videoOverlayPlayBtn" class="w-14 h-14 rounded-full bg-cyan-500/90 text-black flex items-center justify-center hover:scale-110 transition shadow-lg shadow-cyan-500/30">
+                                <svg id="videoOverlayPlayIcon" class="w-6 h-6 fill-current ml-0.5" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="w-full mt-3 px-2 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-400">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-gray-500 font-medium">Ratio:</span>
+                            <button class="aspect-btn bg-cyan-950 text-cyan-400 px-2 py-1 rounded border border-gray-700 font-mono text-[11px] active" data-ratio="16:9">16:9</button>
+                            <button class="aspect-btn bg-dark-700 hover:bg-cyan-950 hover:text-cyan-400 text-gray-300 px-2 py-1 rounded border border-gray-700 font-mono text-[11px]" data-ratio="9:16">9:16</button>
+                            <button class="aspect-btn bg-dark-700 hover:bg-cyan-950 hover:text-cyan-400 text-gray-300 px-2 py-1 rounded border border-gray-700 font-mono text-[11px]" data-ratio="1:1">1:1</button>
+                        </div>
+
+                        <label class="cursor-pointer bg-dark-700 hover:bg-dark-600 text-cyan-400 border border-cyan-500/30 px-3 py-1 rounded-md transition flex items-center space-x-1.5">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                            <span>Load Custom Video</span>
+                            <input type="file" id="videoFileInput" accept="video/*" class="hidden">
+                        </label>
+                    </div>
+                </div>
+
+                <!-- AUDIO PREVIEW PANE -->
+                <div id="audioPreviewPane" class="hidden flex-1 flex flex-col justify-between bg-dark-900 border border-gray-800 rounded-xl p-4">
+                    <div class="flex items-center justify-between pb-3 border-b border-gray-800 flex-wrap gap-2">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-lg bg-purple-950 border border-purple-800 flex items-center justify-center text-purple-400 flex-shrink-0">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12 0c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+                            </div>
+                            <div>
+                                <h4 id="audioFileName" class="text-sm font-semibold text-white truncate max-w-xs sm:max-w-md">Builtin_Synth_Loop_120BPM.wav</h4>
+                                <p id="audioFileDetails" class="text-xs text-purple-400 font-mono">WebAudio Buffer: 44.1kHz • 2 Ch • Decoded PCM</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center space-x-2">
+                            <button id="generateSynthBtn" class="bg-dark-800 hover:bg-purple-950 text-purple-300 border border-purple-800 px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center space-x-1" title="Generate synth beat track">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+                                <span>Synth Track</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Audio Waveform Visualizer Canvas -->
+                    <div class="my-3 relative h-32 bg-dark-950 rounded-lg border border-gray-800/80 overflow-hidden flex items-center justify-center">
+                        <canvas id="waveformCanvas" class="w-full h-full"></canvas>
+                        
+                        <div id="audioDecodingSpinner" class="hidden absolute inset-0 bg-dark-950/90 backdrop-blur-sm flex items-center justify-center space-x-2 z-10">
+                            <div class="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                            <span class="text-xs text-purple-300 font-mono">Decoding PCM Audio Data...</span>
+                        </div>
+
+                        <div class="absolute top-2 right-2 text-[10px] font-mono text-purple-300 bg-purple-950/80 px-2 py-0.5 rounded border border-purple-800/80 z-10">
+                            PCM WAVEFORM
+                        </div>
+                    </div>
+
+                    <!-- Audio Uploader & Exporter Controls -->
+                    <div class="flex items-center justify-between text-xs flex-wrap gap-2">
+                        <label class="cursor-pointer bg-purple-950/80 hover:bg-purple-900 text-purple-200 border border-purple-700/50 px-3 py-1.5 rounded-lg transition flex items-center space-x-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                            <span>Load File (.mp3/.wav)</span>
+                            <input type="file" id="audioFileInput" accept="audio/*" class="hidden">
+                        </label>
+
+                        <button id="exportWavBtn" class="bg-gradient-to-r from-purple-600 to-pink-600 hover:brightness-110 text-white font-medium px-3.5 py-1.5 rounded-lg transition shadow-md shadow-purple-600/20 flex items-center space-x-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                            <span>Export Warped WAV Audio</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- PLAYBACK CONTROLS -->
+                <div class="mt-4 pt-3 border-t border-gray-800/80 flex flex-col space-y-2">
+                    <div class="flex items-center space-x-3">
+                        <button id="mainPlayPauseBtn" class="w-10 h-10 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-black flex items-center justify-center hover:brightness-110 transition shadow-lg shadow-cyan-500/20 flex-shrink-0">
+                            <svg id="mainPlayIcon" class="w-5 h-5 fill-current ml-0.5" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        </button>
+
+                        <div class="flex-1 space-y-1">
+                            <input type="range" id="timelineScrubber" min="0" max="100" value="0" step="0.1" class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+                            <div class="flex justify-between text-[11px] font-mono text-gray-400">
+                                <span id="currentTimeDisplay">00:00.00</span>
+                                <span id="durationTimeDisplay">00:10.00</span>
+                            </div>
+                        </div>
+
+                        <button id="loopToggleBtn" class="p-2 text-cyan-400 bg-dark-700 rounded-lg border border-gray-700 transition" title="Toggle Loop">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ANALYTICS DASHBOARD -->
+            <div class="lg:col-span-4 bg-dark-800/90 rounded-2xl border border-gray-800 p-5 flex flex-col justify-between shadow-xl">
+                <div>
+                    <h3 class="text-sm font-bold text-gray-200 uppercase tracking-wider mb-4 flex items-center space-x-2">
+                        <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                        <span>Curve Analytics</span>
+                    </h3>
+
+                    <div class="grid grid-cols-2 gap-3 mb-4">
+                        <div class="bg-dark-900 border border-gray-800 rounded-xl p-3">
+                            <div class="text-[11px] text-gray-400 uppercase font-medium">Max Velocity</div>
+                            <div id="statMaxSpeed" class="text-lg font-bold text-cyan-400 font-mono mt-1">1.0x</div>
+                        </div>
+                        <div class="bg-dark-900 border border-gray-800 rounded-xl p-3">
+                            <div class="text-[11px] text-gray-400 uppercase font-medium">Min Velocity</div>
+                            <div id="statMinSpeed" class="text-lg font-bold text-purple-400 font-mono mt-1">1.0x</div>
+                        </div>
+                        <div class="bg-dark-900 border border-gray-800 rounded-xl p-3">
+                            <div class="text-[11px] text-gray-400 uppercase font-medium">Avg Speed</div>
+                            <div id="statAvgSpeed" class="text-lg font-bold text-emerald-400 font-mono mt-1">1.0x</div>
+                        </div>
+                        <div class="bg-dark-900 border border-gray-800 rounded-xl p-3">
+                            <div class="text-[11px] text-gray-400 uppercase font-medium">Output Length</div>
+                            <div id="statScaledDuration" class="text-lg font-bold text-amber-400 font-mono mt-1">10.0s</div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2 text-xs text-gray-400 bg-dark-900/60 p-3 rounded-xl border border-gray-800">
+                        <div class="flex justify-between">
+                            <span>Keyframe Nodes:</span>
+                            <span id="statNodeCount" class="text-white font-mono font-bold">2</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Spline Algorithm:</span>
+                            <span id="statSplineAlgorithm" class="text-cyan-400 font-mono">Monotone Cubic Spline</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Audio Status:</span>
+                            <span id="audioEngineStatus" class="text-emerald-400 font-mono">WebAudio Ready</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 pt-4 border-t border-gray-800 space-y-2">
+                    <button id="copyJsonQuickBtn" class="w-full bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-700/50 hover:border-cyan-500 py-2.5 rounded-xl font-medium text-xs transition flex items-center justify-center space-x-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                        <span>Copy Bezier Keyframe JSON</span>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="bg-dark-800/90 rounded-2xl border border-gray-800 p-5 shadow-2xl space-y-4">
+            
+            <!-- CURVE TRANSITION / INTERPOLATION MODE TOGGLE -->
+            <div class="flex items-center justify-between bg-dark-900/80 p-3 rounded-xl border border-gray-800 flex-wrap gap-3">
+                <div class="flex items-center space-x-2">
+                    <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    <span class="text-xs font-bold text-gray-200 uppercase tracking-wider">Speed Transition Type:</span>
+                </div>
+
+                <div class="flex items-center bg-dark-950 border border-gray-800 rounded-lg p-1 space-x-1">
+                    <button class="interp-btn px-3 py-1.5 rounded-md text-xs font-medium transition bg-cyan-950 text-cyan-300 border border-cyan-700/60 shadow-sm" data-mode="smooth" title="Smooth Bezier Spline transitions between nodes">
+                        🌊 Smooth Spline
+                    </button>
+                    <button class="interp-btn px-3 py-1.5 rounded-md text-xs font-medium transition text-gray-400 hover:text-gray-200 hover:bg-dark-800" data-mode="step" title="Instant speed jump at each point without smoothing">
+                        ⚡ Instant / Step Jump
+                    </button>
+                    <button class="interp-btn px-3 py-1.5 rounded-md text-xs font-medium transition text-gray-400 hover:text-gray-200 hover:bg-dark-800" data-mode="linear" title="Straight line speed ramping between nodes">
+                        📏 Linear Direct
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center space-x-2 flex-wrap gap-y-2">
+                    <span class="text-xs font-bold text-gray-300 uppercase tracking-wider mr-2">Presets:</span>
+                    <button class="preset-btn px-3 py-1.5 rounded-lg bg-dark-700 hover:bg-cyan-950 text-gray-300 hover:text-cyan-400 border border-gray-700 text-xs font-medium transition" data-preset="montage">⚡ Montage</button>
+                    <button class="preset-btn px-3 py-1.5 rounded-lg bg-dark-700 hover:bg-cyan-950 text-gray-300 hover:text-cyan-400 border border-gray-700 text-xs font-medium transition" data-preset="hero">🦸 Hero Zoom</button>
+                    <button class="preset-btn px-3 py-1.5 rounded-lg bg-dark-700 hover:bg-cyan-950 text-gray-300 hover:text-cyan-400 border border-gray-700 text-xs font-medium transition" data-preset="bullet">🎯 Bullet Time</button>
+                    <button class="preset-btn px-3 py-1.5 rounded-lg bg-dark-700 hover:bg-cyan-950 text-gray-300 hover:text-cyan-400 border border-gray-700 text-xs font-medium transition" data-preset="beatdrop">🎵 Beat Drop</button>
+                    <button class="preset-btn px-3 py-1.5 rounded-lg bg-dark-700 hover:bg-cyan-950 text-gray-300 hover:text-cyan-400 border border-gray-700 text-xs font-medium transition" data-preset="linear">📏 Linear</button>
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <button id="addNodeBtn" class="px-3 py-1.5 bg-dark-700 hover:bg-dark-600 text-cyan-400 border border-cyan-500/30 rounded-lg text-xs font-medium transition flex items-center space-x-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        <span>Add Point</span>
+                    </button>
+                    <button id="clearNodesBtn" class="px-3 py-1.5 bg-dark-700 hover:bg-red-950/60 text-red-400 border border-red-800/40 rounded-lg text-xs font-medium transition">
+                        Reset Curve
+                    </button>
+                </div>
+            </div>
+
+            <!-- Canvas Area -->
+            <div class="relative w-full h-80 bg-dark-950 rounded-xl border border-gray-800/90 overflow-hidden shadow-inner">
+                <canvas id="curveCanvas" class="w-full h-full block"></canvas>
+
+                <div id="dragTooltip" class="hidden absolute pointer-events-none transform -translate-x-1/2 -translate-y-full mb-3 bg-cyan-500 text-black font-mono font-bold text-xs px-2.5 py-1 rounded shadow-lg shadow-cyan-500/40 z-20 tooltip-arrow">
+                    <span id="tooltipContent">1.0x</span>
+                </div>
+
+                <div class="absolute bottom-2 right-3 text-[10px] font-mono text-gray-500 pointer-events-none flex items-center space-x-2 bg-dark-900/80 px-2 py-1 rounded border border-gray-800">
+                    <span>• Click curve to add point</span>
+                    <span>• Drag handles up/down</span>
+                    <span>• Right-click point to delete</span>
+                </div>
+            </div>
+
+            <!-- Output Data Panel -->
+            <div class="bg-dark-900 rounded-xl border border-gray-800 p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+                        <span class="text-xs font-bold text-gray-300 uppercase tracking-wider">Generated Keyframe Time-Map Data</span>
+                    </div>
+                    <button id="copyJsonBtn" class="px-3 py-1 bg-cyan-950 text-cyan-300 hover:bg-cyan-900 border border-cyan-800/80 rounded-md text-xs font-mono transition flex items-center space-x-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                        <span>Copy JSON</span>
+                    </button>
+                </div>
+
+                <pre id="jsonOutput" class="bg-dark-950 p-3 rounded-lg border border-gray-800/80 text-cyan-400 font-mono text-xs overflow-x-auto max-h-28 select-all">[
+  { "time": 0.00, "speed": 1.00 },
+  { "time": 1.00, "speed": 1.00 }
+]</pre>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-cyan-500 text-black px-4 py-2.5 rounded-xl font-medium text-xs shadow-xl shadow-cyan-500/20 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none z-50 flex items-center space-x-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        <span id="toastMessage">Action completed!</span>
+    </div>
+
+    <script>
+        const state = {
+            currentMode: null, // 'video' or 'audio'
+            isPlaying: false,
+            playbackProgress: 0, // 0.0 to 1.0
+            duration: 10.0, // seconds
+            isLooping: true,
+            interpolationMode: 'smooth', // 'smooth', 'step', or 'linear'
+            
+            nodes: [
+                { x: 0.0, speed: 1.0 },
+                { x: 1.0, speed: 1.0 }
+            ],
+            
+            draggedNodeIndex: -1,
+            hoveredNodeIndex: -1,
+            isDragging: false
+        };
+
+        const PRESETS = {
+            montage: [
+                { x: 0.0, speed: 1.0 },
+                { x: 0.3, speed: 3.5 },
+                { x: 0.6, speed: 0.4 },
+                { x: 1.0, speed: 1.0 }
+            ],
+            hero: [
+                { x: 0.0, speed: 1.0 },
+                { x: 0.2, speed: 0.2 },
+                { x: 0.5, speed: 5.0 },
+                { x: 1.0, speed: 1.0 }
+            ],
+            bullet: [
+                { x: 0.0, speed: 1.0 },
+                { x: 0.4, speed: 0.1 },
+                { x: 0.7, speed: 1.0 },
+                { x: 1.0, speed: 1.0 }
+            ],
+            beatdrop: [
+                { x: 0.0, speed: 0.5 },
+                { x: 0.5, speed: 8.0 },
+                { x: 0.55, speed: 0.5 },
+                { x: 1.0, speed: 1.0 }
+            ],
+            linear: [
+                { x: 0.0, speed: 1.0 },
+                { x: 1.0, speed: 1.0 }
+            ]
+        };
+
+        const landingScreen = document.getElementById('landingScreen');
+        const editorWorkspace = document.getElementById('editorWorkspace');
+        const selectVideoBtn = document.getElementById('selectVideoBtn');
+        const selectAudioBtn = document.getElementById('selectAudioBtn');
+        const backToMenuHeaderBtn = document.getElementById('backToMenuHeaderBtn');
+        const logoHomeBtn = document.getElementById('logoHomeBtn');
+        const modeBadge = document.getElementById('modeBadge');
+        const modeBadgeText = document.getElementById('modeBadgeText');
+        
+        const videoPreviewPane = document.getElementById('videoPreviewPane');
+        const audioPreviewPane = document.getElementById('audioPreviewPane');
+        const videoFrameWrapper = document.getElementById('videoFrameWrapper');
+        const simulatedVideoCanvas = document.getElementById('simulatedVideoCanvas');
+        const htmlVideoPlayer = document.getElementById('htmlVideoPlayer');
+        const liveSpeedText = document.getElementById('liveSpeedText');
+        
+        const waveformCanvas = document.getElementById('waveformCanvas');
+        const audioDecodingSpinner = document.getElementById('audioDecodingSpinner');
+        const audioFileName = document.getElementById('audioFileName');
+        const audioFileDetails = document.getElementById('audioFileDetails');
+        
+        const curveCanvas = document.getElementById('curveCanvas');
+        const ctx = curveCanvas.getContext('2d');
+        const dragTooltip = document.getElementById('dragTooltip');
+        const tooltipContent = document.getElementById('tooltipContent');
+        const jsonOutput = document.getElementById('jsonOutput');
+
+        const mainPlayPauseBtn = document.getElementById('mainPlayPauseBtn');
+        const mainPlayIcon = document.getElementById('mainPlayIcon');
+        const videoOverlayPlayBtn = document.getElementById('videoOverlayPlayBtn');
+        const videoOverlayPlayIcon = document.getElementById('videoOverlayPlayIcon');
+        const timelineScrubber = document.getElementById('timelineScrubber');
+        const currentTimeDisplay = document.getElementById('currentTimeDisplay');
+        const durationTimeDisplay = document.getElementById('durationTimeDisplay');
+        const loopToggleBtn = document.getElementById('loopToggleBtn');
+
+        const statMaxSpeed = document.getElementById('statMaxSpeed');
+        const statMinSpeed = document.getElementById('statMinSpeed');
+        const statAvgSpeed = document.getElementById('statAvgSpeed');
+        const statScaledDuration = document.getElementById('statScaledDuration');
+        const statNodeCount = document.getElementById('statNodeCount');
+
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toastMessage');
+
+        let audioCtx = null;
+        let decodedAudioBuffer = null;
+        let activeSourceNode = null;
+
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContextClass();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        function createDemoSynthAudioBuffer() {
+            const ctx = getAudioContext();
+            const sampleRate = ctx.sampleRate;
+            const duration = 10.0;
+            const numFrames = sampleRate * duration;
+            const buffer = ctx.createBuffer(2, numFrames, sampleRate);
+            
+            const left = buffer.getChannelData(0);
+            const right = buffer.getChannelData(1);
+
+            for (let i = 0; i < numFrames; i++) {
+                const t = i / sampleRate;
+                
+                // Kick drum pulse every 0.5s
+                const kickPhase = (t % 0.5);
+                const kickEnv = Math.exp(-kickPhase * 15);
+                const kickTone = Math.sin(2 * Math.PI * (60 - kickPhase * 40) * kickPhase);
+                
+                // Synth chord pulse
+                const chordEnv = Math.exp(-(t % 0.25) * 8);
+                const synthTone = Math.sin(2 * Math.PI * 440 * t) * 0.3 + Math.sin(2 * Math.PI * 554.37 * t) * 0.2;
+                
+                // Hi-hat noise burst
+                const noise = (Math.random() * 2 - 1) * Math.exp(-(t % 0.125) * 40) * 0.15;
+
+                const signal = (kickTone * kickEnv * 0.6) + (synthTone * chordEnv * 0.3) + noise;
+                left[i] = Math.max(-1, Math.min(1, signal));
+                right[i] = Math.max(-1, Math.min(1, signal));
+            }
+
+            return buffer;
+        }
+
+        function calculateMonotoneSpline(points) {
+            const n = points.length;
+            if (n === 0) return (x) => 1.0;
+            if (n === 1) return (x) => points[0].speed;
+
+            const x = points.map(p => p.x);
+            const y = points.map(p => Math.log10(p.speed));
+
+            const dx = [];
+            const dy = [];
+            const slope = [];
+
+            for (let i = 0; i < n - 1; i++) {
+                dx.push(x[i + 1] - x[i]);
+                dy.push(y[i + 1] - y[i]);
+                slope.push(dy[i] / (dx[i] || 1e-6));
+            }
+
+            const tangents = new Array(n).fill(0);
+            tangents[0] = slope[0];
+            tangents[n - 1] = slope[n - 2];
+
+            for (let i = 1; i < n - 1; i++) {
+                if (slope[i - 1] * slope[i] <= 0) {
+                    tangents[i] = 0;
+                } else {
+                    const common = dx[i - 1] + dx[i];
+                    tangents[i] = (3 * common) / ((common + dx[i]) / slope[i - 1] + (common + dx[i - 1]) / slope[i]);
+                }
+            }
+
+            return function evaluate(t) {
+                t = Math.max(0, Math.min(1, t));
+                if (t <= x[0]) return Math.pow(10, y[0]);
+                if (t >= x[n - 1]) return Math.pow(10, y[n - 1]);
+
+                let i = 0;
+                while (i < n - 1 && x[i + 1] < t) {
+                    i++;
+                }
+
+                const h = dx[i];
+                if (h === 0) return Math.pow(10, y[i]);
+
+                const diff = t - x[i];
+                const tNorm = diff / h;
+                const t2 = tNorm * tNorm;
+                const t3 = t2 * tNorm;
+
+                const h00 = 2 * t3 - 3 * t2 + 1;
+                const h10 = t3 - 2 * t2 + tNorm;
+                const h01 = -2 * t3 + 3 * t2;
+                const h11 = t3 - t2;
+
+                const logSpeed = h00 * y[i] + h10 * h * tangents[i] + h01 * y[i + 1] + h11 * h * tangents[i + 1];
+                return Math.pow(10, logSpeed);
+            };
+        }
+
+        function getSpeedAtTime(t) {
+            const sortedNodes = [...state.nodes].sort((a, b) => a.x - b.x);
+            if (sortedNodes.length === 0) return 1.0;
+            if (sortedNodes.length === 1) return sortedNodes[0].speed;
+
+            t = Math.max(0, Math.min(1, t));
+
+            if (state.interpolationMode === 'step') {
+                // Instant step/jump: hold current node speed until reaching the next node's time
+                let currentSpeed = sortedNodes[0].speed;
+                for (let i = 0; i < sortedNodes.length; i++) {
+                    if (t >= sortedNodes[i].x) {
+                        currentSpeed = sortedNodes[i].speed;
+                    } else {
+                        break;
+                    }
+                }
+                return Math.max(0.1, Math.min(10.0, currentSpeed));
+            } else if (state.interpolationMode === 'linear') {
+                if (t <= sortedNodes[0].x) return sortedNodes[0].speed;
+                if (t >= sortedNodes[sortedNodes.length - 1].x) return sortedNodes[sortedNodes.length - 1].speed;
+
+                for (let i = 0; i < sortedNodes.length - 1; i++) {
+                    if (t >= sortedNodes[i].x && t <= sortedNodes[i + 1].x) {
+                        const segLength = sortedNodes[i + 1].x - sortedNodes[i].x;
+                        if (segLength === 0) return sortedNodes[i].speed;
+                        const factor = (t - sortedNodes[i].x) / segLength;
+                        const logA = Math.log10(sortedNodes[i].speed);
+                        const logB = Math.log10(sortedNodes[i + 1].speed);
+                        return Math.max(0.1, Math.min(10.0, Math.pow(10, logA + factor * (logB - logA))));
+                    }
+                }
+                return sortedNodes[sortedNodes.length - 1].speed;
+            } else {
+                // Default monotone cubic spline curve
+                const evaluator = calculateMonotoneSpline(sortedNodes);
+                return Math.max(0.1, Math.min(10.0, evaluator(t)));
+            }
+        }
+
+        function startWebAudioPlayback() {
+            if (!decodedAudioBuffer) return;
+            const audioCtx = getAudioContext();
+            
+            if (activeSourceNode) {
+                try { activeSourceNode.stop(); } catch(e){}
+                activeSourceNode.disconnect();
+            }
+
+            activeSourceNode = audioCtx.createBufferSource();
+            activeSourceNode.buffer = decodedAudioBuffer;
+            activeSourceNode.loop = state.isLooping;
+            activeSourceNode.connect(audioCtx.destination);
+
+            const startOffset = state.playbackProgress * state.duration;
+            const currentSpeed = getSpeedAtTime(state.playbackProgress);
+            activeSourceNode.playbackRate.setValueAtTime(currentSpeed, audioCtx.currentTime);
+            activeSourceNode.start(0, startOffset);
+        }
+
+        function stopWebAudioPlayback() {
+            if (activeSourceNode) {
+                try { activeSourceNode.stop(); } catch(e){}
+                activeSourceNode.disconnect();
+                activeSourceNode = null;
+            }
+        }
+
+        let lastTimestamp = 0;
+
+        function playbackLoop(timestamp) {
+            if (!lastTimestamp) lastTimestamp = timestamp;
+            const deltaSec = (timestamp - lastTimestamp) / 1000;
+            lastTimestamp = timestamp;
+
+            if (state.isPlaying) {
+                const currentSpeed = getSpeedAtTime(state.playbackProgress);
+                const step = (deltaSec / state.duration) * currentSpeed;
+                state.playbackProgress += step;
+
+                // Modulate real-time WebAudio playback rate
+                if (activeSourceNode && activeSourceNode.playbackRate) {
+                    activeSourceNode.playbackRate.setValueAtTime(currentSpeed, getAudioContext().currentTime);
+                }
+
+                if (state.playbackProgress >= 1.0) {
+                    if (state.isLooping) {
+                        state.playbackProgress = 0;
+                        if (state.currentMode === 'audio' && decodedAudioBuffer) {
+                            startWebAudioPlayback();
+                        }
+                    } else {
+                        state.playbackProgress = 1.0;
+                        togglePlay(false);
+                    }
+                }
+
+                if (!htmlVideoPlayer.classList.contains('hidden') && !htmlVideoPlayer.paused) {
+                    htmlVideoPlayer.playbackRate = Math.max(0.1, Math.min(16.0, currentSpeed));
+                }
+
+                timelineScrubber.value = state.playbackProgress * 100;
+                liveSpeedText.textContent = `${currentSpeed.toFixed(2)}x`;
+                
+                const curSec = (state.playbackProgress * state.duration).toFixed(2);
+                currentTimeDisplay.textContent = `00:${curSec < 10 ? '0' : ''}${curSec}`;
+            }
+
+            drawSimulatedVideoFrame(timestamp);
+            if (state.currentMode === 'audio') {
+                renderWaveformCanvas();
+            }
+            renderCurveCanvas();
+
+            requestAnimationFrame(playbackLoop);
+        }
+
+        function togglePlay(play) {
+            state.isPlaying = play !== undefined ? play : !state.isPlaying;
+            
+            const playSvg = '<path d="M8 5v14l11-7z"/>';
+            const pauseSvg = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+            const iconHtml = state.isPlaying ? pauseSvg : playSvg;
+
+            mainPlayIcon.innerHTML = iconHtml;
+            videoOverlayPlayIcon.innerHTML = iconHtml;
+
+            if (state.currentMode === 'video') {
+                if (htmlVideoPlayer && !htmlVideoPlayer.classList.contains('hidden')) {
+                    if (state.isPlaying) htmlVideoPlayer.play();
+                    else htmlVideoPlayer.pause();
+                }
+            } else if (state.currentMode === 'audio') {
+                if (state.isPlaying) {
+                    startWebAudioPlayback();
+                } else {
+                    stopWebAudioPlayback();
+                }
+            }
+        }
+
+        function drawSimulatedVideoFrame(timestamp) {
+            if (!simulatedVideoCanvas || !simulatedVideoCanvas.parentElement) return;
+            const container = simulatedVideoCanvas.parentElement;
+            if (simulatedVideoCanvas.width !== container.clientWidth || simulatedVideoCanvas.height !== container.clientHeight) {
+                simulatedVideoCanvas.width = container.clientWidth;
+                simulatedVideoCanvas.height = container.clientHeight;
+            }
+
+            const sCtx = simulatedVideoCanvas.getContext('2d');
+            const w = simulatedVideoCanvas.width;
+            const h = simulatedVideoCanvas.height;
+
+            sCtx.fillStyle = '#090a0f';
+            sCtx.fillRect(0, 0, w, h);
+
+            // Dynamic geometric patterns reflecting speed Ramping
+            const speed = getSpeedAtTime(state.playbackProgress);
+            const time = timestamp * 0.002 * speed;
+            const centerX = w / 2;
+            const centerY = h / 2;
+
+            sCtx.save();
+            sCtx.translate(centerX, centerY);
+            sCtx.rotate(time * 0.5);
+
+            const numRings = 5;
+            for (let i = 0; i < numRings; i++) {
+                const radius = 30 + i * 22 + Math.sin(time + i) * 10;
+                sCtx.beginPath();
+                sCtx.arc(0, 0, radius, 0, Math.PI * 2);
+                sCtx.strokeStyle = i % 2 === 0 ? `rgba(0, 242, 254, ${0.2 + (i/numRings)*0.5})` : `rgba(168, 85, 247, ${0.2 + (i/numRings)*0.5})`;
+                sCtx.lineWidth = 2 + (speed > 3 ? 2 : 0);
+                sCtx.setLineDash([10, 15]);
+                sCtx.stroke();
+            }
+
+            sCtx.restore();
+
+            // Progress bar overlay on simulated video frame
+            sCtx.fillStyle = '#00f2fe';
+            sCtx.fillRect(0, h - 4, w * state.playbackProgress, 4);
+        }
+
+        function renderWaveformCanvas() {
+            if (!waveformCanvas || !waveformCanvas.parentElement) return;
+            const parent = waveformCanvas.parentElement;
+            if (waveformCanvas.width !== parent.clientWidth || waveformCanvas.height !== parent.clientHeight) {
+                waveformCanvas.width = parent.clientWidth;
+                waveformCanvas.height = parent.clientHeight;
+            }
+
+            const wCtx = waveformCanvas.getContext('2d');
+            const w = waveformCanvas.width;
+            const h = waveformCanvas.height;
+
+            wCtx.fillStyle = '#090a0f';
+            wCtx.fillRect(0, 0, w, h);
+
+            if (!decodedAudioBuffer) return;
+
+            const channelData = decodedAudioBuffer.getChannelData(0);
+            const step = Math.ceil(channelData.length / w);
+            const amp = h / 2;
+
+            // Draw PCM Waveform bars
+            wCtx.fillStyle = 'rgba(168, 85, 247, 0.4)';
+            for (let i = 0; i < w; i++) {
+                let min = 1.0;
+                let max = -1.0;
+                for (let j = 0; j < step; j++) {
+                    const datum = channelData[i * step + j];
+                    if (datum < min) min = datum;
+                    if (datum > max) max = datum;
+                }
+                const y1 = (1 + min) * amp;
+                const y2 = (1 + max) * amp;
+                
+                const progressX = w * state.playbackProgress;
+                if (i <= progressX) {
+                    wCtx.fillStyle = '#00f2fe';
+                } else {
+                    wCtx.fillStyle = 'rgba(168, 85, 247, 0.4)';
+                }
+                wCtx.fillRect(i, y1, 1, Math.max(1, y2 - y1));
+            }
+
+            // Draw Speed Overlay Curve on top of Audio Waveform
+            wCtx.beginPath();
+            wCtx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+            wCtx.lineWidth = 1.5;
+            for (let x = 0; x < w; x++) {
+                const normX = x / w;
+                const spd = getSpeedAtTime(normX);
+                // Map log speed 0.1..10 to h..0
+                const logSpd = Math.log10(spd); // -1 to +1
+                const normY = (1 - logSpd) / 2;
+                const y = normY * h;
+                if (x === 0) wCtx.moveTo(x, y);
+                else wCtx.lineTo(x, y);
+            }
+            wCtx.stroke();
+
+            // Playback head line
+            const headX = state.playbackProgress * w;
+            wCtx.strokeStyle = '#ffffff';
+            wCtx.lineWidth = 2;
+            wCtx.beginPath();
+            wCtx.moveTo(headX, 0);
+            wCtx.lineTo(headX, h);
+            wCtx.stroke();
+        }
+
+        function renderCurveCanvas() {
+            if (!curveCanvas || !curveCanvas.parentElement) return;
+            const parent = curveCanvas.parentElement;
+            if (curveCanvas.width !== parent.clientWidth || curveCanvas.height !== parent.clientHeight) {
+                curveCanvas.width = parent.clientWidth;
+                curveCanvas.height = parent.clientHeight;
+            }
+
+            const w = curveCanvas.width;
+            const h = curveCanvas.height;
+            const padding = 20;
+
+            ctx.fillStyle = '#090a0f';
+            ctx.fillRect(0, 0, w, h);
+
+            // Helpers to convert node coordinates
+            function speedToY(speed) {
+                const minLog = -1.0; // 0.1x
+                const maxLog = 1.0;  // 10.0x
+                const logVal = Math.log10(Math.max(0.1, Math.min(10.0, speed)));
+                const normY = (logVal - minLog) / (maxLog - minLog);
+                return (h - padding) - normY * (h - 2 * padding);
+            }
+
+            function yToSpeed(y) {
+                const minLog = -1.0;
+                const maxLog = 1.0;
+                const normY = ( (h - padding) - y ) / (h - 2 * padding);
+                const clampedNormY = Math.max(0, Math.min(1, normY));
+                const logVal = minLog + clampedNormY * (maxLog - minLog);
+                return Math.pow(10, logVal);
+            }
+
+            function xToCanvas(xNorm) {
+                return padding + xNorm * (w - 2 * padding);
+            }
+
+            function canvasToX(xCanvas) {
+                const normX = (xCanvas - padding) / (w - 2 * padding);
+                return Math.max(0, Math.min(1, normX));
+            }
+
+            // Draw Background Grid & Velocity Multiplier Labels
+            const speedLevels = [
+                { speed: 10.0, label: '10.0x' },
+                { speed: 5.0, label: '5.0x' },
+                { speed: 2.0, label: '2.0x' },
+                { speed: 1.0, label: '1.0x (Normal)' },
+                { speed: 0.5, label: '0.5x' },
+                { speed: 0.1, label: '0.1x' }
+            ];
+
+            speedLevels.forEach(level => {
+                const y = speedToY(level.speed);
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(w - padding, y);
+                
+                if (level.speed === 1.0) {
+                    ctx.strokeStyle = 'rgba(0, 242, 254, 0.4)';
+                    ctx.setLineDash([6, 4]);
+                    ctx.lineWidth = 1.5;
+                } else {
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+                    ctx.setLineDash([4, 4]);
+                    ctx.lineWidth = 1;
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.fillStyle = level.speed === 1.0 ? '#00f2fe' : '#6b7280';
+                ctx.font = '10px JetBrains Mono';
+                ctx.fillText(level.label, padding + 6, y - 4);
+            });
+
+            // Draw Curve Line based on active mode
+            ctx.beginPath();
+            ctx.lineWidth = 3;
+
+            const gradient = ctx.createLinearGradient(0, 0, w, 0);
+            gradient.addColorStop(0, '#00f2fe');
+            gradient.addColorStop(0.5, '#4facfe');
+            gradient.addColorStop(1, '#a855f7');
+            ctx.strokeStyle = gradient;
+
+            const graphW = w - 2 * padding;
+            for (let px = 0; px <= graphW; px++) {
+                const normX = px / graphW;
+                const spd = getSpeedAtTime(normX);
+                const py = speedToY(spd);
+                const cx = padding + px;
+
+                if (px === 0) ctx.moveTo(cx, py);
+                else ctx.lineTo(cx, py);
+            }
+            ctx.stroke();
+
+            // Fill area under curve
+            ctx.lineTo(w - padding, h - padding);
+            ctx.lineTo(padding, h - padding);
+            ctx.closePath();
+            const fillGrad = ctx.createLinearGradient(0, 0, 0, h);
+            fillGrad.addColorStop(0, 'rgba(0, 242, 254, 0.12)');
+            fillGrad.addColorStop(1, 'rgba(0, 242, 254, 0.0)');
+            ctx.fillStyle = fillGrad;
+            ctx.fill();
+
+            // Draw Interactive Control Points (Nodes)
+            state.nodes.forEach((node, idx) => {
+                const nx = xToCanvas(node.x);
+                const ny = speedToY(node.speed);
+                const isHovered = idx === state.hoveredNodeIndex;
+                const isDragged = idx === state.draggedNodeIndex;
+
+                // Glowing outer ring for active nodes
+                if (isHovered || isDragged) {
+                    ctx.beginPath();
+                    ctx.arc(nx, ny, 12, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(0, 242, 254, 0.25)';
+                    ctx.fill();
+                }
+
+                ctx.beginPath();
+                ctx.arc(nx, ny, isHovered || isDragged ? 7 : 5, 0, Math.PI * 2);
+                ctx.fillStyle = isDragged ? '#ec4899' : (isHovered ? '#00f2fe' : '#ffffff');
+                ctx.fill();
+                ctx.strokeStyle = '#090a0f';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+
+            // Draw Playback Head Cursor Line
+            const headX = xToCanvas(state.playbackProgress);
+            ctx.beginPath();
+            ctx.moveTo(headX, padding);
+            ctx.lineTo(headX, h - padding);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.shadowColor = '#00f2fe';
+            ctx.shadowBlur = 8;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            updateAnalyticsAndJSON();
+
+            // Update attached functions inside curve render scope
+            curveCanvas.speedToY = speedToY;
+            curveCanvas.yToSpeed = yToSpeed;
+            curveCanvas.xToCanvas = xToCanvas;
+            curveCanvas.canvasToX = canvasToX;
+        }
+
+        function updateAnalyticsAndJSON() {
+            const sortedNodes = [...state.nodes].sort((a, b) => a.x - b.x);
+            const speeds = sortedNodes.map(n => n.speed);
+            const maxSpd = Math.max(...speeds);
+            const minSpd = Math.min(...speeds);
+            
+            let totalScaledTime = 0;
+            const samples = 100;
+            const dt = 1 / samples;
+            for (let i = 0; i < samples; i++) {
+                const t = i * dt;
+                const spd = getSpeedAtTime(t);
+                totalScaledTime += dt / spd;
+            }
+            const scaledDuration = state.duration * totalScaledTime;
+            const avgSpeed = state.duration / scaledDuration;
+
+            statMaxSpeed.textContent = `${maxSpd.toFixed(2)}x`;
+            statMinSpeed.textContent = `${minSpd.toFixed(2)}x`;
+            statAvgSpeed.textContent = `${avgSpeed.toFixed(2)}x`;
+            statScaledDuration.textContent = `${scaledDuration.toFixed(2)}s`;
+            statNodeCount.textContent = sortedNodes.length;
+
+            const statSplineAlgorithm = document.getElementById('statSplineAlgorithm');
+            if (statSplineAlgorithm) {
+                statSplineAlgorithm.textContent = state.interpolationMode === 'step' 
+                    ? 'Instant Step Jump' 
+                    : state.interpolationMode === 'linear' 
+                    ? 'Linear Direct' 
+                    : 'Monotone Cubic Spline';
+            }
+
+            const formattedJSON = sortedNodes.map(n => ({
+                time: parseFloat(n.x.toFixed(2)),
+                speed: parseFloat(n.speed.toFixed(2))
+            }));
+
+            jsonOutput.textContent = JSON.stringify(formattedJSON, null, 2);
+        }
+
+        curveCanvas.addEventListener('mousemove', (e) => {
+            const rect = curveCanvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            if (state.isDragging && state.draggedNodeIndex !== -1) {
+                const node = state.nodes[state.draggedNodeIndex];
+
+                // Lock end points horizontally
+                if (state.draggedNodeIndex !== 0 && state.draggedNodeIndex !== state.nodes.length - 1) {
+                    node.x = curveCanvas.canvasToX(mouseX);
+                }
+
+                node.speed = curveCanvas.yToSpeed(mouseY);
+                state.nodes.sort((a, b) => a.x - b.x);
+
+                // Update tooltip
+                dragTooltip.classList.remove('hidden');
+                dragTooltip.style.left = `${mouseX}px`;
+                dragTooltip.style.top = `${mouseY}px`;
+                tooltipContent.textContent = `${node.speed.toFixed(2)}x`;
+
+                renderCurveCanvas();
+                if (state.currentMode === 'audio') renderWaveformCanvas();
+                return;
+            }
+
+            // Check hover status over existing nodes
+            let foundHover = -1;
+            state.nodes.forEach((node, idx) => {
+                const nx = curveCanvas.xToCanvas(node.x);
+                const ny = curveCanvas.speedToY(node.speed);
+                const dist = Math.hypot(mouseX - nx, mouseY - ny);
+                if (dist < 10) foundHover = idx;
+            });
+
+            if (state.hoveredNodeIndex !== foundHover) {
+                state.hoveredNodeIndex = foundHover;
+                renderCurveCanvas();
+            }
+        });
+
+        curveCanvas.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return; // Left click only
+            const rect = curveCanvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            if (state.hoveredNodeIndex !== -1) {
+                state.draggedNodeIndex = state.hoveredNodeIndex;
+                state.isDragging = true;
+            } else {
+                // Add new point on click
+                const newX = curveCanvas.canvasToX(mouseX);
+                const newSpeed = curveCanvas.yToSpeed(mouseY);
+                state.nodes.push({ x: newX, speed: newSpeed });
+                state.nodes.sort((a, b) => a.x - b.x);
+                renderCurveCanvas();
+                if (state.currentMode === 'audio') renderWaveformCanvas();
+                showToast("Added new speed point");
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (state.isDragging) {
+                state.isDragging = false;
+                state.draggedNodeIndex = -1;
+                dragTooltip.classList.add('hidden');
+                renderCurveCanvas();
+                if (state.currentMode === 'audio') renderWaveformCanvas();
+            }
+        });
+
+        curveCanvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            const rect = curveCanvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            // Delete node on right click
+            state.nodes.forEach((node, idx) => {
+                const nx = curveCanvas.xToCanvas(node.x);
+                const ny = curveCanvas.speedToY(node.speed);
+                const dist = Math.hypot(mouseX - nx, mouseY - ny);
+                if (dist < 10) {
+                    if (idx === 0 || idx === state.nodes.length - 1) {
+                        showToast("Cannot delete start or end boundary nodes");
+                    } else {
+                        state.nodes.splice(idx, 1);
+                        state.hoveredNodeIndex = -1;
+                        renderCurveCanvas();
+                        if (state.currentMode === 'audio') renderWaveformCanvas();
+                        showToast("Deleted speed node");
+                    }
+                }
+            });
+        });
+
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const key = btn.dataset.preset;
+                if (PRESETS[key]) {
+                    state.nodes = JSON.parse(JSON.stringify(PRESETS[key]));
+                    renderCurveCanvas();
+                    if (state.currentMode === 'audio') renderWaveformCanvas();
+                    showToast(`Applied ${key.toUpperCase()} preset`);
+                }
+            });
+        });
+
+        document.querySelectorAll('.interp-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.interp-btn').forEach(b => {
+                    b.className = 'interp-btn px-3 py-1.5 rounded-md text-xs font-medium transition text-gray-400 hover:text-gray-200 hover:bg-dark-800';
+                });
+                btn.className = 'interp-btn px-3 py-1.5 rounded-md text-xs font-medium transition bg-cyan-950 text-cyan-300 border border-cyan-700/60 shadow-sm';
+                state.interpolationMode = btn.dataset.mode;
+                renderCurveCanvas();
+                if (state.currentMode === 'audio') renderWaveformCanvas();
+                showToast(`Switched transition mode to ${btn.dataset.mode.toUpperCase()}`);
+            });
+        });
+
+        document.getElementById('addNodeBtn').addEventListener('click', () => {
+            state.nodes.push({ x: 0.5, speed: 2.0 });
+            state.nodes.sort((a, b) => a.x - b.x);
+            renderCurveCanvas();
+            if (state.currentMode === 'audio') renderWaveformCanvas();
+            showToast("Added node at 50% position");
+        });
+
+        document.getElementById('clearNodesBtn').addEventListener('click', () => {
+            state.nodes = [
+                { x: 0.0, speed: 1.0 },
+                { x: 1.0, speed: 1.0 }
+            ];
+            renderCurveCanvas();
+            if (state.currentMode === 'audio') renderWaveformCanvas();
+            showToast("Reset curve to linear speed");
+        });
+
+        // Audio File Upload
+        document.getElementById('audioFileInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            audioDecodingSpinner.classList.remove('hidden');
+            const arrayBuffer = await file.arrayBuffer();
+            const ctx = getAudioContext();
+
+            ctx.decodeAudioData(arrayBuffer, (buffer) => {
+                decodedAudioBuffer = buffer;
+                state.duration = buffer.duration;
+                durationTimeDisplay.textContent = `${state.duration.toFixed(2)}s`;
+                audioFileName.textContent = file.name;
+                audioFileDetails.textContent = `Decoded PCM • ${(buffer.sampleRate/1000).toFixed(1)}kHz • ${buffer.numberOfChannels} Ch`;
+                audioDecodingSpinner.classList.add('hidden');
+                renderWaveformCanvas();
+                showToast(`Loaded audio file: ${file.name}`);
+            }, () => {
+                audioDecodingSpinner.classList.add('hidden');
+                showToast("Failed to decode audio file format");
+            });
+        });
+
+        document.getElementById('generateSynthBtn').addEventListener('click', () => {
+            audioDecodingSpinner.classList.remove('hidden');
+            setTimeout(() => {
+                decodedAudioBuffer = createDemoSynthAudioBuffer();
+                state.duration = decodedAudioBuffer.duration;
+                durationTimeDisplay.textContent = `${state.duration.toFixed(2)}s`;
+                audioFileName.textContent = "Builtin_Synth_Loop_120BPM.wav";
+                audioFileDetails.textContent = "WebAudio Synthesizer • 44.1kHz • 2 Ch";
+                audioDecodingSpinner.classList.add('hidden');
+                renderWaveformCanvas();
+                showToast("Generated synth loop audio buffer");
+            }, 100);
+        });
+
+        // OfflineAudioContext WAV Exporter
+        document.getElementById('exportWavBtn').addEventListener('click', async () => {
+            if (!decodedAudioBuffer) {
+                showToast("Please load an audio track first");
+                return;
+            }
+
+            showToast("Rendering speed-warped audio...");
+
+            let totalScaledTime = 0;
+            const samples = 200;
+            const dt = 1 / samples;
+            for (let i = 0; i < samples; i++) {
+                const t = i * dt;
+                const spd = getSpeedAtTime(t);
+                totalScaledTime += dt / spd;
+            }
+            const outputDuration = state.duration * totalScaledTime;
+
+            const sampleRate = decodedAudioBuffer.sampleRate;
+            const offlineCtx = new OfflineAudioContext(
+                decodedAudioBuffer.numberOfChannels,
+                Math.ceil(sampleRate * outputDuration),
+                sampleRate
+            );
+
+            const source = offlineCtx.createBufferSource();
+            source.buffer = decodedAudioBuffer;
+
+            const timeSteps = 100;
+            for (let i = 0; i <= timeSteps; i++) {
+                const normT = i / timeSteps;
+                const speed = getSpeedAtTime(normT);
+                const targetTime = normT * outputDuration;
+                source.playbackRate.setValueAtTime(speed, targetTime);
+            }
+
+            source.connect(offlineCtx.destination);
+            source.start(0);
+
+            const renderedBuffer = await offlineCtx.startRendering();
+            const wavBlob = audioBufferToWavBlob(renderedBuffer);
+
+            const url = URL.createObjectURL(wavBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `warped_${audioFileName.textContent.replace(/\.[^/.]+$/, "")}.wav`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            showToast("Exported warped WAV file successfully!");
+        });
+
+        function audioBufferToWavBlob(buffer) {
+            const numOfChan = buffer.numberOfChannels;
+            const length = buffer.length * numOfChan * 2 + 44;
+            const out = new DataView(new ArrayBuffer(length));
+            let channels = [], sampleRate = buffer.sampleRate, offset = 0, pos = 0;
+
+            function setUint16(data) { out.setUint16(pos, data, true); pos += 2; }
+            function setUint32(data) { out.setUint32(pos, data, true); pos += 4; }
+
+            setUint32(0x46464952); // "RIFF"
+            setUint32(length - 8);
+            setUint32(0x45564157); // "WAVE"
+            setUint32(0x20746d66); // "fmt "
+            setUint32(16);
+            setUint16(1); // PCM
+            setUint16(numOfChan);
+            setUint32(sampleRate);
+            setUint32(sampleRate * 2 * numOfChan);
+            setUint16(numOfChan * 2);
+            setUint16(16);
+            setUint32(0x61746164); // "data"
+            setUint32(length - pos - 4);
+
+            for (let i = 0; i < buffer.numberOfChannels; i++) channels.push(buffer.getChannelData(i));
+
+            while (offset < buffer.length) {
+                for (let i = 0; i < numOfChan; i++) {
+                    let sample = Math.max(-1, Math.min(1, channels[i][offset]));
+                    sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+                    out.setInt16(pos, sample, true);
+                    pos += 2;
+                }
+                offset++;
+            }
+            return new Blob([out.buffer], { type: "audio/wav" });
+        }
+
+        function launchEditorMode(mode) {
+            state.currentMode = mode;
+            landingScreen.classList.add('hidden');
+            editorWorkspace.classList.remove('hidden');
+            backToMenuHeaderBtn.classList.remove('hidden');
+            modeBadge.classList.remove('hidden');
+
+            if (mode === 'video') {
+                modeBadgeText.textContent = 'Video Speed Ramp Studio';
+                videoPreviewPane.classList.remove('hidden');
+                audioPreviewPane.classList.add('hidden');
+            } else {
+                modeBadgeText.textContent = 'Audio Speed & Pitch Warp Studio';
+                videoPreviewPane.classList.add('hidden');
+                audioPreviewPane.classList.remove('hidden');
+
+                if (!decodedAudioBuffer) {
+                    decodedAudioBuffer = createDemoSynthAudioBuffer();
+                    renderWaveformCanvas();
+                }
+            }
+
+            setTimeout(() => {
+                renderCurveCanvas();
+                if (mode === 'audio') renderWaveformCanvas();
+            }, 50);
+        }
+
+        function returnToMainMenu() {
+            togglePlay(false);
+            stopWebAudioPlayback();
+            editorWorkspace.classList.add('hidden');
+            landingScreen.classList.remove('hidden');
+            backToMenuHeaderBtn.classList.add('hidden');
+            modeBadge.classList.add('hidden');
+        }
+
+        selectVideoBtn.addEventListener('click', () => launchEditorMode('video'));
+        selectAudioBtn.addEventListener('click', () => launchEditorMode('audio'));
+        backToMenuHeaderBtn.addEventListener('click', returnToMainMenu);
+        logoHomeBtn.addEventListener('click', returnToMainMenu);
+
+        mainPlayPauseBtn.addEventListener('click', () => togglePlay());
+        videoOverlayPlayBtn.addEventListener('click', () => togglePlay());
+
+        timelineScrubber.addEventListener('input', (e) => {
+            state.playbackProgress = parseFloat(e.target.value) / 100;
+            if (state.currentMode === 'audio' && state.isPlaying) {
+                startWebAudioPlayback();
+            }
+            const curSec = (state.playbackProgress * state.duration).toFixed(2);
+            currentTimeDisplay.textContent = `00:${curSec < 10 ? '0' : ''}${curSec}`;
+            renderCurveCanvas();
+            if (state.currentMode === 'audio') renderWaveformCanvas();
+        });
+
+        loopToggleBtn.addEventListener('click', () => {
+            state.isLooping = !state.isLooping;
+            loopToggleBtn.classList.toggle('text-cyan-400', state.isLooping);
+            loopToggleBtn.classList.toggle('text-gray-500', !state.isLooping);
+            showToast(state.isLooping ? "Looping Enabled" : "Looping Disabled");
+        });
+
+        document.querySelectorAll('.aspect-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.aspect-btn').forEach(b => {
+                    b.className = 'aspect-btn bg-dark-700 hover:bg-cyan-950 hover:text-cyan-400 text-gray-300 px-2 py-1 rounded border border-gray-700 font-mono text-[11px]';
+                });
+                btn.className = 'aspect-btn bg-cyan-950 text-cyan-400 px-2 py-1 rounded border border-gray-700 font-mono text-[11px] active';
+                const ratio = btn.dataset.ratio;
+                if (ratio === '16:9') {
+                    videoFrameWrapper.className = 'w-full max-w-lg aspect-video bg-black rounded-lg flex items-center justify-center relative overflow-hidden transition-all duration-300 shadow-2xl';
+                } else if (ratio === '9:16') {
+                    videoFrameWrapper.className = 'w-48 h-80 bg-black rounded-lg flex items-center justify-center relative overflow-hidden transition-all duration-300 shadow-2xl';
+                } else if (ratio === '1:1') {
+                    videoFrameWrapper.className = 'w-72 h-72 bg-black rounded-lg flex items-center justify-center relative overflow-hidden transition-all duration-300 shadow-2xl';
+                }
+            });
+        });
+
+        document.getElementById('videoFileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const url = URL.createObjectURL(file);
+                htmlVideoPlayer.src = url;
+                htmlVideoPlayer.classList.remove('hidden');
+                simulatedVideoCanvas.classList.add('hidden');
+                htmlVideoPlayer.onloadedmetadata = () => {
+                    state.duration = htmlVideoPlayer.duration || 10.0;
+                    durationTimeDisplay.textContent = `${state.duration.toFixed(2)}s`;
+                    showToast(`Loaded video: ${file.name}`);
+                };
+            }
+        });
+
+        function copyJsonToClipboard() {
+            const text = jsonOutput.textContent;
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            showToast("Keyframe JSON copied to clipboard!");
+        }
+
+        document.getElementById('copyJsonBtn').addEventListener('click', copyJsonToClipboard);
+        document.getElementById('copyJsonQuickBtn').addEventListener('click', copyJsonToClipboard);
+
+        let toastTimeout = null;
+        function showToast(msg) {
+            toastMessage.textContent = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        window.addEventListener('resize', () => {
+            renderCurveCanvas();
+            if (state.currentMode === 'audio') renderWaveformCanvas();
+        });
+
+        window.onload = function() {
+            renderCurveCanvas();
+            requestAnimationFrame(playbackLoop);
+        };
+    </script>
+</body>
+</html>

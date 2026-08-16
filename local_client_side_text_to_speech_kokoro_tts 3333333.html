@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kokoro TTS - 100% Serverless Local Text-to-Speech</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #090d16;
+            color: #f1f5f9;
+        }
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        .pulse-glow {
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-emerald-500/30 selection:text-emerald-300">
+
+    <!-- Top Header Bar -->
+    <header class="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-emerald-500/20">
+                    <svg class="w-5 h-5 stroke-current" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-base font-bold bg-gradient-to-r from-slate-100 via-slate-200 to-emerald-400 bg-clip-text text-transparent flex items-center gap-2">
+                        Kokoro TTS Engine
+                        <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800/50 font-mono font-medium">Kokoro-82M</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">100% Client-Side Serverless Audio Synthesis</p>
+                </div>
+            </div>
+
+            <!-- Controls Header Right: Chime Toggle & Status Badge -->
+            <div class="flex items-center gap-4">
+                <!-- Completion Chime Toggle -->
+                <label class="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-300 hover:text-white transition-colors select-none bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full">
+                    <span>🔔 Chime on completion</span>
+                    <input type="checkbox" id="chimeToggle" checked class="sr-only peer">
+                    <div class="w-8 h-4 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-500 relative"></div>
+                </label>
+
+                <!-- Network Status & Offline Indicator -->
+                <div id="statusDot" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-slate-900 border border-slate-800">
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" id="dotPing"></span>
+                    <span id="statusText" class="text-slate-300">Model Unloaded</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Layout -->
+    <main class="max-w-6xl mx-auto px-4 py-6 w-full flex-grow grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left Controls & Input Column (7 cols) -->
+        <section class="lg:col-span-7 flex flex-col gap-5">
+
+            <!-- Profile Selector Card -->
+            <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-1">Hardware Profile</span>
+                    <p class="text-xs text-slate-400">Optimizes execution provider and model quantization.</p>
+                </div>
+                <!-- Segmented Control Pills -->
+                <div class="flex p-1 bg-slate-950 rounded-xl border border-slate-800/80 self-start sm:self-auto">
+                    <button type="button" data-profile="gpu" onclick="selectHardwareProfile('gpu')" class="profile-btn px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 text-slate-400 hover:text-white">
+                        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        GPU (WebGPU)
+                    </button>
+                    <button type="button" data-profile="cpu" onclick="selectHardwareProfile('cpu')" class="profile-btn px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 text-slate-400 hover:text-white">
+                        <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
+                        </svg>
+                        CPU (WASM q8)
+                    </button>
+                    <button type="button" data-profile="phone" onclick="selectHardwareProfile('phone')" class="profile-btn px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 text-slate-400 hover:text-white">
+                        <svg class="w-3.5 h-3.5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                        </svg>
+                        Phone (q4)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Voice & Speech Parameters Card -->
+            <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Voice Selection Dropdown -->
+                <div>
+                    <label for="voiceSelect" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Speaker Voice</label>
+                    <select id="voiceSelect" class="w-full bg-slate-950 text-slate-200 text-sm rounded-xl border border-slate-800 px-3 py-2.5 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
+                        <option value="am_adam" selected>👨 Adam (American Male - Default)</option>
+                        <option value="af_heart">👩 Heart (American Female)</option>
+                        <option value="af_bella">👩 Bella (American Female)</option>
+                        <option value="af_nicole">👩 Nicole (American Female)</option>
+                        <option value="af_sarah">👩 Sarah (American Female)</option>
+                        <option value="af_sky">👩 Sky (American Female)</option>
+                        <option value="am_michael">👨 Michael (American Male)</option>
+                        <option value="bf_emma">👩 Emma (British Female)</option>
+                        <option value="bf_isabella">👩 Isabella (British Female)</option>
+                        <option value="bm_george">👨 George (British Male)</option>
+                        <option value="bm_lewis">👨 Lewis (British Male)</option>
+                    </select>
+                </div>
+
+                <!-- Speech Speed Slider -->
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label for="speedSlider" class="text-xs font-semibold uppercase tracking-wider text-slate-400">Speech Pace</label>
+                        <span id="speedValue" class="text-xs font-mono font-bold text-emerald-400">1.0x</span>
+                    </div>
+                    <input type="range" id="speedSlider" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('speedValue').innerText = parseFloat(this.value).toFixed(1) + 'x'" class="w-full h-2 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-emerald-500 my-2">
+                    <div class="flex justify-between text-[10px] text-slate-400 font-mono">
+                        <span>0.5x (Slow)</span>
+                        <span>1.0x (Normal)</span>
+                        <span>2.0x (Fast)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Text Input & Chunking Card -->
+            <div class="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl flex flex-col gap-3 flex-grow">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <label for="textInput" class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                        </svg>
+                        Input Text Block
+                    </label>
+
+                    <!-- Sample Presets -->
+                    <div class="flex items-center gap-1.5 text-xs">
+                        <span class="text-slate-400 hidden sm:inline">Samples:</span>
+                        <button type="button" onclick="loadPreset('tech')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors">Tech</button>
+                        <button type="button" onclick="loadPreset('story')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors">Story</button>
+                        <button type="button" onclick="loadPreset('podcast')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors">Podcast</button>
+                        <button type="button" onclick="clearText()" class="px-2 py-1 rounded bg-slate-800 hover:bg-red-950 hover:text-red-400 text-slate-400 transition-colors">Clear</button>
+                    </div>
+                </div>
+
+                <!-- Textarea -->
+                <textarea id="textInput" rows="6" oninput="updateTextMetrics()" placeholder="Enter or paste text here to generate high-quality synthesized speech locally..." class="w-full bg-slate-950 text-slate-100 text-sm rounded-xl border border-slate-800 p-3.5 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 leading-relaxed resize-none"></textarea>
+
+                <!-- Metrics Footer -->
+                <div class="flex flex-wrap items-center justify-between text-xs text-slate-400 pt-1 border-t border-slate-800/60 font-mono">
+                    <div class="flex items-center gap-4">
+                        <span>Chars: <strong id="charCount" class="text-slate-200">0</strong></span>
+                        <span>Words: <strong id="wordCount" class="text-slate-200">0</strong></span>
+                        <span>Balanced Chunks: <strong id="chunkCount" class="text-emerald-400">0</strong></span>
+                    </div>
+                    <span id="estDuration" class="text-slate-400">Est. ~0s audio</span>
+                </div>
+
+                <!-- Primary Generate Button -->
+                <button type="button" id="generateBtn" onclick="handleGenerateSpeech()" class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 active:scale-[0.99] text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 mt-2">
+                    <svg id="generateIcon" class="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z"/>
+                    </svg>
+                    <span id="generateBtnText">Synthesize Speech</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Right Output & Audio Processing Column (5 cols) -->
+        <section class="lg:col-span-5 flex flex-col gap-5">
+
+            <!-- Model Download / Live Progress & ETA Tracker Card -->
+            <div id="progressCard" class="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl hidden flex-col gap-3">
+                <div class="flex items-center justify-between">
+                    <span id="progressTitle" class="text-xs font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+                        <svg class="w-4 h-4 animate-spin text-emerald-400" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Inference Running
+                    </span>
+                    <span id="progressPercent" class="text-xs font-mono font-bold text-slate-300">0%</span>
+                </div>
+
+                <!-- Live ETA Indicator Badge -->
+                <div class="flex items-center justify-between bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800 text-xs font-mono">
+                    <span class="text-slate-400 flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5 text-cyan-400 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Live ETA:
+                    </span>
+                    <span id="etaText" class="text-emerald-400 font-bold">Calculating after Chunk 1...</span>
+                </div>
+
+                <!-- Progress Bar Container -->
+                <div class="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
+                    <div id="progressBar" class="h-full bg-gradient-to-r from-emerald-500 to-cyan-400 rounded-full transition-all duration-300 w-0"></div>
+                </div>
+
+                <!-- Status Subtext -->
+                <p id="progressSubtext" class="text-xs text-slate-400 font-mono truncate">Preparing model worker...</p>
+            </div>
+
+            <!-- Audio Output Player Card -->
+            <div id="playerCard" class="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl flex flex-col gap-4">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-200">Audio Preview</h2>
+                    </div>
+                    <span id="audioSpecsBadge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">24kHz WAV</span>
+                </div>
+
+                <!-- Waveform Canvas Visualizer -->
+                <div class="relative w-full h-24 bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex items-center justify-center">
+                    <canvas id="waveformCanvas" class="w-full h-full block"></canvas>
+                    <div id="canvasEmptyText" class="absolute text-xs text-slate-600 font-mono pointer-events-none">Audio waveform preview</div>
+                </div>
+
+                <!-- HTML5 Native Audio Player -->
+                <div class="w-full">
+                    <audio id="audioElement" controls class="w-full h-10 rounded-lg accent-emerald-500"></audio>
+                </div>
+
+                <!-- Audio Statistics Grid -->
+                <div class="grid grid-cols-2 gap-2 text-xs font-mono bg-slate-950/80 p-3 rounded-xl border border-slate-800/80">
+                    <div>
+                        <span class="text-slate-500 block text-[10px] uppercase">Duration</span>
+                        <span id="statDuration" class="text-slate-200 font-bold">0.0s</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block text-[10px] uppercase">File Size</span>
+                        <span id="statSize" class="text-slate-200 font-bold">0 KB</span>
+                    </div>
+                </div>
+
+                <!-- Silence Eraser Section -->
+                <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-2.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L5.6 15.17a2 2 0 00-1.164.331M15 9l-3 3m0 0l-3-3m3 3V3"/>
+                            </svg>
+                            Silence Eraser
+                        </span>
+                        <span class="text-[10px] font-mono text-slate-400">&lt; -40dB (&gt;300ms)</span>
+                    </div>
+
+                    <!-- Silence Trim Result Status -->
+                    <div id="silenceInfo" class="hidden text-xs text-emerald-400 font-mono bg-emerald-950/50 p-2 rounded-lg border border-emerald-900/60">
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="removeSilenceBtn" onclick="handleRemoveSilence()" class="flex-1 py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-750 text-xs font-medium text-slate-200 border border-slate-700 transition-all flex items-center justify-center gap-1.5">
+                            <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                            Remove Silences
+                        </button>
+                        <button type="button" id="resetSilenceBtn" onclick="handleResetSilence()" class="hidden py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 text-xs text-slate-400 transition-all border border-slate-800">
+                            Reset
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Action Download Button -->
+                <button type="button" id="downloadWavBtn" onclick="downloadWavFile()" class="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 font-semibold text-xs border border-emerald-500/30 transition-all flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4 stroke-current" fill="none" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    Download Clean WAV File
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <!-- Application Footer -->
+    <footer class="border-t border-slate-800/80 bg-slate-950/60 py-4 text-center text-xs text-slate-400">
+        <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2 font-mono">
+            <span>Powered by Kokoro-82M ONNX &amp; Web Workers</span>
+            <span>100% Local Inference • Zero Server Calls</span>
+        </div>
+    </footer>
+
+    <!-- Toast Notification Overlay -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4"></div>
+
+    <script>
+        const workerScriptText = `
+        import { KokoroTTS } from "https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js";
+
+        let tts = null;
+        let activeConfigKey = null;
+
+        /**
+         * Smart Cadence Engine Trimmer: Scans Float32Array and removes all leading and trailing samples
+         * where absolute amplitude is below threshold (0.005 / extreme dead silence).
+         * Aggressively trims artificial empty space tails on short chunk fragments.
+         */
+        function trimSilence(samples, threshold = 0.005) {
+            if (!samples || samples.length === 0) return new Float32Array(0);
+
+            let start = 0;
+            while (start < samples.length && Math.abs(samples[start]) < threshold) {
+                start++;
+            }
+
+            // Entire chunk is below silence threshold
+            if (start >= samples.length) {
+                return new Float32Array(0);
+            }
+
+            let end = samples.length - 1;
+            while (end > start && Math.abs(samples[end]) < threshold) {
+                end--;
+            }
+
+            return samples.subarray(start, end + 1);
+        }
+
+        self.onmessage = async (e) => {
+            const { type, payload } = e.data;
+
+            if (type === 'INIT') {
+                const { modelId, dtype, device } = payload;
+                const configKey = \`\${modelId}:\${dtype}:\${device}\`;
+
+                try {
+                    if (!tts || activeConfigKey !== configKey) {
+                        self.postMessage({ 
+                            type: 'STATUS', 
+                            payload: { stage: 'loading', message: 'Downloading & compiling Kokoro ONNX model (~85MB)...' } 
+                        });
+
+                        tts = await KokoroTTS.from_pretrained(modelId, {
+                            dtype: dtype,
+                            device: device
+                        });
+                        activeConfigKey = configKey;
+                    }
+
+                    self.postMessage({ type: 'INIT_SUCCESS', payload: { configKey } });
+                } catch (err) {
+                    self.postMessage({ type: 'ERROR', payload: err.message || 'Failed to initialize Kokoro model' });
+                }
+            } 
+            else if (type === 'GENERATE') {
+                const { chunks, voice, speed, modelId, dtype, device } = payload;
+                const configKey = \`\${modelId}:\${dtype}:\${device}\`;
+
+                try {
+                    if (!tts || activeConfigKey !== configKey) {
+                        self.postMessage({ 
+                            type: 'STATUS', 
+                            payload: { stage: 'loading', message: 'Loading model weights into memory...' } 
+                        });
+                        tts = await KokoroTTS.from_pretrained(modelId, {
+                            dtype: dtype,
+                            device: device
+                        });
+                        activeConfigKey = configKey;
+                    }
+
+                    const generatedBuffers = [];
+                    let sampleRate = 24000;
+                    let totalSamples = 0;
+
+                    for (let i = 0; i < chunks.length; i++) {
+                        const chunkText = chunks[i];
+                        const currentChunk = i + 1;
+                        const totalChunks = chunks.length;
+                        const chunkStartTime = performance.now();
+
+                        const output = await tts.generate(chunkText, {
+                            voice: voice || 'am_adam',
+                            speed: speed || 1.0
+                        });
+
+                        const chunkExecutionTimeMs = performance.now() - chunkStartTime;
+
+                        let channelData = null;
+                        if (output) {
+                            if (output.audio instanceof Float32Array) {
+                                channelData = output.audio;
+                            } else if (output.audio && output.audio.data instanceof Float32Array) {
+                                channelData = output.audio.data;
+                            } else if (Array.isArray(output.audio)) {
+                                channelData = new Float32Array(output.audio);
+                            }
+
+                            if (output.sampling_rate) {
+                                sampleRate = output.sampling_rate;
+                            } else if (output.audio && output.audio.sampling_rate) {
+                                sampleRate = output.audio.sampling_rate;
+                            }
+                        }
+
+                        if (channelData && channelData.length > 0) {
+                            // Aggressively trim leading and trailing artificial dead silence (< 0.005 threshold)
+                            const trimmedChunk = trimSilence(channelData, 0.005);
+
+                            if (trimmedChunk.length > 0) {
+                                // Smart Cadence: Insert an exact 350ms soft silence breathing gap between chunks
+                                if (generatedBuffers.length > 0) {
+                                    const gapSamplesCount = Math.floor(sampleRate * 0.350);
+                                    const breathingGapBuffer = new Float32Array(gapSamplesCount);
+                                    generatedBuffers.push(breathingGapBuffer);
+                                    totalSamples += breathingGapBuffer.length;
+                                }
+
+                                generatedBuffers.push(trimmedChunk);
+                                totalSamples += trimmedChunk.length;
+                            }
+                        }
+
+                        // Notify main thread of chunk completion and exact execution duration
+                        self.postMessage({
+                            type: 'PROGRESS',
+                            payload: {
+                                currentChunk: currentChunk,
+                                totalChunks: totalChunks,
+                                text: chunkText,
+                                percent: Math.round((currentChunk / totalChunks) * 100),
+                                chunkExecutionTimeMs: chunkExecutionTimeMs,
+                                statusText: \`Synthesized chunk \${currentChunk}/\${totalChunks}\`
+                            }
+                        });
+                    }
+
+                    if (generatedBuffers.length === 0) {
+                        throw new Error("No audio frames generated.");
+                    }
+
+                    // Stitch all dynamically trimmed chunks and breathing gaps seamlessly
+                    const mergedBuffer = new Float32Array(totalSamples);
+                    let offset = 0;
+                    for (const buf of generatedBuffers) {
+                        mergedBuffer.set(buf, offset);
+                        offset += buf.length;
+                    }
+
+                    self.postMessage({
+                        type: 'GENERATE_SUCCESS',
+                        payload: {
+                            audioData: mergedBuffer,
+                            sampleRate: sampleRate
+                        }
+                    }, [mergedBuffer.buffer]);
+
+                } catch (err) {
+                    self.postMessage({ type: 'ERROR', payload: err.message || 'Generation failed' });
+                }
+            }
+        };
+        `;
+
+        // Create Blob worker URL
+        const workerBlob = new Blob([workerScriptText], { type: 'application/javascript' });
+        const workerUrl = URL.createObjectURL(workerBlob);
+        let ttsWorker = null;
+
+        // Application State Management
+        const state = {
+            currentProfile: 'gpu', // 'gpu' | 'cpu' | 'phone'
+            modelId: 'onnx-community/Kokoro-82M-ONNX',
+            isGenerating: false,
+            isModelReady: false,
+            rawAudioData: null,      // Float32Array of current audio
+            originalAudioData: null, // Float32Array of unmodified raw audio
+            sampleRate: 24000,
+            activeWavBlob: null,
+            chunk1DurationMs: null  // Exact processing time of chunk 1
+        };
+
+        // Text Sample Presets
+        const PRESETS = {
+            tech: "Kokoro is an 82-million parameter lightweight text-to-speech model. Operating completely client-side via WebGPU and WASM, it achieves real-time speech generation without sending any text to external servers.",
+            story: "The old library stood silent under the moonlight. As Arthur opened the leather-bound book, a faint golden glow radiated from its ancient pages, whispering secrets long forgotten.",
+            podcast: "Welcome back to the Future Tech Daily podcast. Today, we are exploring how quantized ONNX models allow browser applications to run deep learning pipelines locally."
+        };
+
+        window.addEventListener('load', () => {
+            initializeHardwareProfiles();
+            updateTextMetrics();
+            setupNetworkListeners();
+            initWebWorker();
+            loadPreset('tech');
+            setupCanvasResize();
+        });
+
+        /**
+         * Native Web Audio Completion Chime
+         * Synthesizes a clean dual-tone electronic "ding" (880Hz -> 1760Hz) for 150ms
+         */
+        function playCompletionChime() {
+            try {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContextClass) return;
+                const audioCtx = new AudioContextClass();
+                const now = audioCtx.currentTime;
+
+                // Tone 1: 880Hz for 75ms
+                const osc1 = audioCtx.createOscillator();
+                const gain1 = audioCtx.createGain();
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(880, now);
+                gain1.gain.setValueAtTime(0.2, now);
+                gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
+                osc1.connect(gain1);
+                gain1.connect(audioCtx.destination);
+                osc1.start(now);
+                osc1.stop(now + 0.075);
+
+                // Tone 2: 1760Hz for 75ms
+                const osc2 = audioCtx.createOscillator();
+                const gain2 = audioCtx.createGain();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(1760, now + 0.075);
+                gain2.gain.setValueAtTime(0.25, now + 0.075);
+                gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.150);
+                osc2.connect(gain2);
+                gain2.connect(audioCtx.destination);
+                osc2.start(now + 0.075);
+                osc2.stop(now + 0.150);
+            } catch (err) {
+                console.warn('Could not play audio chime:', err);
+            }
+        }
+
+        function selectHardwareProfile(profileKey) {
+            state.currentProfile = profileKey;
+            
+            // Highlight buttons
+            document.querySelectorAll('.profile-btn').forEach(btn => {
+                const pk = btn.getAttribute('data-profile');
+                if (pk === profileKey) {
+                    btn.className = "profile-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20";
+                } else {
+                    btn.className = "profile-btn px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 text-slate-400 hover:text-white";
+                }
+            });
+
+            const config = getTransformersConfig();
+            showToast(`Profile: ${profileKey.toUpperCase()} (${config.device}/${config.dtype})`, 'info');
+        }
+
+        function getTransformersConfig() {
+            switch (state.currentProfile) {
+                case 'gpu':
+                    return { device: 'webgpu', dtype: 'q8' };
+                case 'cpu':
+                    return { device: 'wasm', dtype: 'q8' };
+                case 'phone':
+                    return { device: 'wasm', dtype: 'q4' };
+                default:
+                    return { device: 'wasm', dtype: 'q8' };
+            }
+        }
+
+        function initializeHardwareProfiles() {
+            if (navigator.gpu) {
+                selectHardwareProfile('gpu');
+            } else {
+                selectHardwareProfile('cpu');
+            }
+        }
+
+        function initWebWorker() {
+            if (ttsWorker) ttsWorker.terminate();
+            
+            ttsWorker = new Worker(workerUrl, { type: 'module' });
+
+            ttsWorker.onmessage = (e) => {
+                const { type, payload } = e.data;
+
+                if (type === 'STATUS') {
+                    updateStatusDot('loading', payload.message);
+                    updateProgressUI(true, 0, payload.message);
+                }
+                else if (type === 'PROGRESS') {
+                    const { currentChunk, totalChunks, text, percent, chunkExecutionTimeMs, statusText } = payload;
+                    
+                    // Live ETA Tracker calculation based on exact Chunk 1 duration
+                    if (currentChunk === 1 && chunkExecutionTimeMs) {
+                        state.chunk1DurationMs = chunkExecutionTimeMs;
+                    }
+
+                    let etaDisplay = "Calculating...";
+                    if (state.chunk1DurationMs && totalChunks > 1) {
+                        const remainingChunks = totalChunks - currentChunk;
+                        const remainingMs = remainingChunks * state.chunk1DurationMs;
+                        const remainingSec = (remainingMs / 1000).toFixed(1);
+                        etaDisplay = remainingChunks > 0 ? `~${remainingSec}s remaining (${(state.chunk1DurationMs).toFixed(0)}ms/chunk)` : "Finalizing audio...";
+                    } else if (totalChunks === 1) {
+                        etaDisplay = "Almost done...";
+                    }
+
+                    document.getElementById('etaText').innerText = etaDisplay;
+
+                    const statusMsg = statusText || `Synthesizing chunk ${currentChunk}/${totalChunks}`;
+                    updateStatusDot('generating', statusMsg);
+                    updateProgressUI(true, percent, `${statusMsg} — "${text.substring(0, 32)}..."`);
+                }
+                else if (type === 'INIT_SUCCESS') {
+                    state.isModelReady = true;
+                    updateStatusDot('ready', 'Model Cached & Ready');
+                    updateProgressUI(false);
+                }
+                else if (type === 'GENERATE_SUCCESS') {
+                    state.isGenerating = false;
+                    state.isModelReady = true;
+                    state.rawAudioData = payload.audioData;
+                    state.originalAudioData = new Float32Array(payload.audioData); // Deep copy
+                    state.sampleRate = payload.sampleRate;
+
+                    // Play completion chime if toggle is enabled
+                    const chimeEnabled = document.getElementById('chimeToggle').checked;
+                    if (chimeEnabled) {
+                        playCompletionChime();
+                    }
+
+                    updateStatusDot('ready', 'Synthesis Complete');
+                    updateProgressUI(false);
+                    resetSilenceUI();
+                    processAndDisplayAudio(payload.audioData, payload.sampleRate);
+                    showToast('Audio synthesized seamlessly!', 'success');
+                    setGenerateButtonState(false);
+                }
+                else if (type === 'ERROR') {
+                    state.isGenerating = false;
+                    updateStatusDot('error', 'Inference Error');
+                    updateProgressUI(false);
+                    setGenerateButtonState(false);
+                    showToast(`Error: ${payload}`, 'error');
+                }
+            };
+        }
+
+        /**
+         * Equalize Chunk Splitting
+         * Distributes text into balanced chunks aiming for a target size of ~135 characters.
+         * Prioritizes sentence ends (. ! ?) and clauses (, ; :) within proximity.
+         */
+        function splitTextIntoBalancedChunks(text, targetSize = 135) {
+            if (!text || !text.trim()) return [];
+            
+            const normalized = text.replace(/\r\n/g, '\n').trim();
+            if (normalized.length <= targetSize + 25) return [normalized];
+
+            const chunks = [];
+            let remaining = normalized;
+
+            while (remaining.length > 0) {
+                if (remaining.length <= targetSize + 25) {
+                    chunks.push(remaining.trim());
+                    break;
+                }
+
+                let splitIdx = -1;
+                const searchStart = Math.max(30, targetSize - 45);
+                const searchEnd = Math.min(remaining.length, targetSize + 40);
+                const windowText = remaining.substring(searchStart, searchEnd);
+
+                // Priority 1: Sentence terminator (. ! ?) followed by space or end
+                const sentenceMatch = windowText.match(/[.!?](\s+|$)/);
+                if (sentenceMatch && sentenceMatch.index !== undefined) {
+                    splitIdx = searchStart + sentenceMatch.index + 1;
+                } else {
+                    // Priority 2: Clause boundary (, ; :) followed by space
+                    const clauseMatch = windowText.match(/[,;:](\s+|$)/);
+                    if (clauseMatch && clauseMatch.index !== undefined) {
+                        splitIdx = searchStart + clauseMatch.index + 1;
+                    } else {
+                        // Priority 3: Space nearest to targetSize
+                        let bestSpace = -1;
+                        let minDiff = Infinity;
+                        for (let i = searchStart; i < searchEnd; i++) {
+                            if (remaining[i] === ' ' || remaining[i] === '\n') {
+                                const diff = Math.abs(i - targetSize);
+                                if (diff < minDiff) {
+                                    minDiff = diff;
+                                    bestSpace = i;
+                                }
+                            }
+                        }
+                        splitIdx = (bestSpace !== -1) ? bestSpace : targetSize;
+                    }
+                }
+
+                const chunk = remaining.substring(0, splitIdx).trim();
+                if (chunk) chunks.push(chunk);
+                remaining = remaining.substring(splitIdx).trim();
+            }
+
+            return chunks;
+        }
+
+        function handleGenerateSpeech() {
+            const text = document.getElementById('textInput').value.trim();
+            if (!text) {
+                showToast('Please enter some text to synthesize.', 'warning');
+                return;
+            }
+
+            // Utilize equalized chunk splitter
+            const chunks = splitTextIntoBalancedChunks(text, 135);
+            if (chunks.length === 0) return;
+
+            // Reset ETA timing state
+            state.chunk1DurationMs = null;
+            document.getElementById('etaText').innerText = "Calculating after Chunk 1...";
+
+            // Update chunk count metric
+            document.getElementById('chunkCount').innerText = chunks.length;
+
+            const voice = document.getElementById('voiceSelect').value;
+            const speed = parseFloat(document.getElementById('speedSlider').value);
+            const config = getTransformersConfig();
+
+            state.isGenerating = true;
+            setGenerateButtonState(true);
+
+            updateProgressUI(true, 0, `Initializing ${config.device.toUpperCase()} pipeline (${chunks.length} balanced chunks)...`);
+            updateStatusDot('generating', `Synthesizing chunk 1/${chunks.length}`);
+
+            ttsWorker.postMessage({
+                type: 'GENERATE',
+                payload: {
+                    chunks: chunks,
+                    voice: voice,
+                    speed: speed,
+                    modelId: state.modelId,
+                    dtype: config.dtype,
+                    device: config.device
+                }
+            });
+        }
+
+        function handleRemoveSilence() {
+            if (!state.rawAudioData) {
+                showToast('No audio available to trim.', 'warning');
+                return;
+            }
+
+            const threshold = 0.01; // Equivalent to -40dB
+            const minSilenceMs = 300;
+            const sampleRate = state.sampleRate;
+            const minSilenceSamples = Math.floor((sampleRate * minSilenceMs) / 1000);
+
+            const samples = state.rawAudioData;
+            const keepSegments = [];
+
+            let inSilence = false;
+            let silenceStart = 0;
+            let segmentStart = 0;
+
+            for (let i = 0; i < samples.length; i++) {
+                const isSilent = Math.abs(samples[i]) < threshold;
+
+                if (isSilent) {
+                    if (!inSilence) {
+                        inSilence = true;
+                        silenceStart = i;
+                    }
+                } else {
+                    if (inSilence) {
+                        inSilence = false;
+                        const silenceLen = i - silenceStart;
+                        if (silenceLen >= minSilenceSamples) {
+                            if (silenceStart > segmentStart) {
+                                keepSegments.push({ start: segmentStart, end: silenceStart });
+                            }
+                            segmentStart = i;
+                        }
+                    }
+                }
+            }
+
+            if (segmentStart < samples.length) {
+                if (inSilence) {
+                    const silenceLen = samples.length - silenceStart;
+                    if (silenceLen >= minSilenceSamples) {
+                        if (silenceStart > segmentStart) {
+                            keepSegments.push({ start: segmentStart, end: silenceStart });
+                        }
+                    } else {
+                        keepSegments.push({ start: segmentStart, end: samples.length });
+                    }
+                } else {
+                    keepSegments.push({ start: segmentStart, end: samples.length });
+                }
+            }
+
+            let totalTrimmedLength = 0;
+            for (const seg of keepSegments) {
+                totalTrimmedLength += (seg.end - seg.start);
+            }
+
+            if (totalTrimmedLength === 0 || totalTrimmedLength === samples.length) {
+                showToast('No silences exceeding threshold were found.', 'info');
+                return;
+            }
+
+            const trimmedAudio = new Float32Array(totalTrimmedLength);
+            let writePos = 0;
+            for (const seg of keepSegments) {
+                trimmedAudio.set(samples.subarray(seg.start, seg.end), writePos);
+                writePos += (seg.end - seg.start);
+            }
+
+            const origSec = (samples.length / sampleRate).toFixed(2);
+            const newSec = (trimmedAudio.length / sampleRate).toFixed(2);
+            const diffSec = (origSec - newSec).toFixed(2);
+
+            state.rawAudioData = trimmedAudio;
+            processAndDisplayAudio(trimmedAudio, sampleRate);
+
+            const silenceInfoEl = document.getElementById('silenceInfo');
+            silenceInfoEl.innerHTML = `✓ Removed <strong>${diffSec}s</strong> of silence (${origSec}s → ${newSec}s)`;
+            silenceInfoEl.classList.remove('hidden');
+            document.getElementById('resetSilenceBtn').classList.remove('hidden');
+
+            showToast(`Silence removed! Reduced duration by ${diffSec}s.`, 'success');
+        }
+
+        function handleResetSilence() {
+            if (!state.originalAudioData) return;
+            state.rawAudioData = new Float32Array(state.originalAudioData);
+            processAndDisplayAudio(state.rawAudioData, state.sampleRate);
+            resetSilenceUI();
+            showToast('Audio reset to original synthesis.', 'info');
+        }
+
+        function resetSilenceUI() {
+            document.getElementById('silenceInfo').classList.add('hidden');
+            document.getElementById('resetSilenceBtn').classList.add('hidden');
+        }
+
+        function encodeWavBlob(samples, sampleRate = 24000) {
+            const numChannels = 1;
+            const bytesPerSample = 2; // 16-bit
+            const blockAlign = numChannels * bytesPerSample;
+            const byteRate = sampleRate * blockAlign;
+            const dataSize = samples.length * bytesPerSample;
+            const buffer = new ArrayBuffer(44 + dataSize);
+            const view = new DataView(buffer);
+
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + dataSize, true);
+            writeString(view, 8, 'WAVE');
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, byteRate, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, 16, true);
+            writeString(view, 36, 'data');
+            view.setUint32(40, dataSize, true);
+
+            let offset = 44;
+            for (let i = 0; i < samples.length; i++) {
+                let s = Math.max(-1, Math.min(1, samples[i]));
+                view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+                offset += 2;
+            }
+
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+
+        function processAndDisplayAudio(audioData, sampleRate) {
+            const wavBlob = encodeWavBlob(audioData, sampleRate);
+            state.activeWavBlob = wavBlob;
+
+            const audioUrl = URL.createObjectURL(wavBlob);
+            const audioElement = document.getElementById('audioElement');
+            audioElement.src = audioUrl;
+
+            const duration = (audioData.length / sampleRate).toFixed(1);
+            const sizeKb = (wavBlob.size / 1024).toFixed(0);
+
+            document.getElementById('statDuration').innerText = `${duration}s`;
+            document.getElementById('statSize').innerText = `${sizeKb} KB`;
+
+            drawWaveform(audioData);
+        }
+
+        function downloadWavFile() {
+            if (!state.activeWavBlob) {
+                showToast('No audio available for download.', 'warning');
+                return;
+            }
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(state.activeWavBlob);
+            a.download = `kokoro-speech-${Date.now()}.wav`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function drawWaveform(audioData) {
+            const canvas = document.getElementById('waveformCanvas');
+            const emptyText = document.getElementById('canvasEmptyText');
+            if (emptyText) emptyText.style.display = 'none';
+
+            const ctx = canvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            
+            canvas.width = canvas.clientWidth * dpr;
+            canvas.height = canvas.clientHeight * dpr;
+            ctx.scale(dpr, dpr);
+
+            const width = canvas.clientWidth;
+            const height = canvas.clientHeight;
+
+            ctx.clearRect(0, 0, width, height);
+
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, height / 2);
+            ctx.lineTo(width, height / 2);
+            ctx.stroke();
+
+            const step = Math.ceil(audioData.length / width);
+            const amp = height / 2.2;
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 1.5;
+
+            for (let i = 0; i < width; i++) {
+                let min = 1.0;
+                let max = -1.0;
+
+                for (let j = 0; j < step; j++) {
+                    const datum = audioData[(i * step) + j];
+                    if (datum < min) min = datum;
+                    if (datum > max) max = datum;
+                }
+
+                const x = i;
+                const y1 = (1 + min) * amp;
+                const y2 = (1 + max) * amp;
+
+                ctx.moveTo(x, y1);
+                ctx.lineTo(x, y2);
+            }
+            ctx.stroke();
+        }
+
+        function setupCanvasResize() {
+            window.addEventListener('resize', () => {
+                if (state.rawAudioData) {
+                    drawWaveform(state.rawAudioData);
+                }
+            });
+        }
+
+        function updateTextMetrics() {
+            const text = document.getElementById('textInput').value;
+            const charCount = text.length;
+            const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
+            const chunks = splitTextIntoBalancedChunks(text, 135);
+            
+            const estSeconds = Math.round(charCount / 15);
+
+            document.getElementById('charCount').innerText = charCount;
+            document.getElementById('wordCount').innerText = wordCount;
+            document.getElementById('chunkCount').innerText = chunks.length;
+            document.getElementById('estDuration').innerText = `Est. ~${estSeconds}s audio`;
+        }
+
+        function loadPreset(key) {
+            if (PRESETS[key]) {
+                document.getElementById('textInput').value = PRESETS[key];
+                updateTextMetrics();
+            }
+        }
+
+        function clearText() {
+            document.getElementById('textInput').value = '';
+            updateTextMetrics();
+        }
+
+        function setGenerateButtonState(isLoading) {
+            const btn = document.getElementById('generateBtn');
+            const btnText = document.getElementById('generateBtnText');
+            const icon = document.getElementById('generateIcon');
+
+            if (isLoading) {
+                btn.disabled = true;
+                btn.classList.add('opacity-75', 'cursor-not-allowed');
+                btnText.innerText = "Synthesizing...";
+                icon.innerHTML = `<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>`;
+                icon.classList.add('animate-spin');
+            } else {
+                btn.disabled = false;
+                btn.classList.remove('opacity-75', 'cursor-not-allowed');
+                btnText.innerText = "Synthesize Speech";
+                icon.innerHTML = `<path d="M8 5v14l11-7z"/>`;
+                icon.classList.remove('animate-spin');
+            }
+        }
+
+        function updateProgressUI(show, percent = 0, message = '') {
+            const card = document.getElementById('progressCard');
+            const bar = document.getElementById('progressBar');
+            const percentEl = document.getElementById('progressPercent');
+            const subtext = document.getElementById('progressSubtext');
+
+            if (show) {
+                card.classList.remove('hidden');
+                card.classList.add('flex');
+                bar.style.width = `${percent}%`;
+                percentEl.innerText = `${percent}%`;
+                if (message) subtext.innerText = message;
+            } else {
+                card.classList.add('hidden');
+                card.classList.remove('flex');
+            }
+        }
+
+        function updateStatusDot(mode, text) {
+            const dot = document.getElementById('dotPing');
+            const statusText = document.getElementById('statusText');
+            statusText.innerText = text;
+
+            if (mode === 'loading' || mode === 'generating') {
+                dot.className = "w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping";
+            } else if (mode === 'ready') {
+                dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400";
+            } else if (mode === 'error') {
+                dot.className = "w-2.5 h-2.5 rounded-full bg-red-500";
+            } else {
+                dot.className = "w-2.5 h-2.5 rounded-full bg-slate-500";
+            }
+        }
+
+        function setupNetworkListeners() {
+            const updateOnlineStatus = () => {
+                if (!navigator.onLine) {
+                    showToast('Network offline. Serving Kokoro from IndexedDB cache.', 'info');
+                }
+            };
+            window.addEventListener('online', updateOnlineStatus);
+            window.addEventListener('offline', updateOnlineStatus);
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+
+            let borderClass = 'border-slate-700 bg-slate-900 text-slate-200';
+            if (type === 'success') borderClass = 'border-emerald-500/50 bg-slate-900 text-emerald-300';
+            if (type === 'error') borderClass = 'border-red-500/50 bg-slate-900 text-red-300';
+            if (type === 'warning') borderClass = 'border-amber-500/50 bg-slate-900 text-amber-300';
+
+            toast.className = `p-3 rounded-xl border text-xs font-medium shadow-2xl transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto ${borderClass}`;
+            toast.innerText = message;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+    </script>
+</body>
+</html>
